@@ -8,6 +8,22 @@ class MyUserPay
   private static $apiDefError;
   private static $get_connected_puadvertiser;
   
+
+  public static function curl_get_contents($url) {
+    $ch = curl_init();
+
+    curl_setopt($ch, CURLOPT_AUTOREFERER, TRUE);
+    curl_setopt($ch, CURLOPT_HEADER, 0);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);       
+
+    $data = curl_exec($ch);
+    curl_close($ch);
+
+    return $data;
+}
+
   public static function setPrivateKey($privateKey)
   {
    
@@ -24,7 +40,7 @@ class MyUserPay
           'type'    => "request"
       ),
     );
-    $fcontents = file_get_contents('https://www.myuser.com/get_connected_puadvertiser/'.self::$privateKey);
+    $fcontents = self::curl_get_contents('https://pay.myuser.com/get_connected_puadvertiser/'.self::$privateKey);
     $fcontents = utf8_encode($fcontents);
     self::$get_connected_puadvertiser = json_decode($fcontents,true); 
     $json = new ResponseObject;
@@ -117,6 +133,7 @@ class MyUserPay
         //not defined we will send error message
       }
     }
+    $data['token']=htmlspecialchars($data['token']);
     return self::request('/charges', $data);
   }
   
