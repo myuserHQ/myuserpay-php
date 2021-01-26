@@ -8,20 +8,58 @@ class MyUserPay
   private static $apiDefError;
   private static $get_connected_puadvertiser;
   
+  public static function http_post_function($full_path,$params){
+    //$params['username']=>which is username:password for curl for whatever used
+    //if WORDPRESS PLUGIN:
+    /*$r_headers=array();
+    if(isset($params['username'])){
+      $r_headers['Authorization'] = 'Basic ' . base64_encode( $params['username'].':'.'' );
+    }
+    $wresponse = wp_remote_post( $full_path, array(
+        'body'    => $params['body'],
+        'headers' => $r_headers,
+    ) );
+    $response=wp_remote_retrieve_body($wresponse);*/
+    //IF SEPERATE CODE:
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL,$full_path);
+    if(isset($params['username']) && !isset($params['password'])){
+      curl_setopt($ch, CURLOPT_USERPWD, $params['username']);  
+    }else if(isset($params['username']) && isset($params['password'])){
+      curl_setopt($ch, CURLOPT_USERPWD, $params['username'].':'.$params['password']);
+    }
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params['body']));
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    curl_close ($ch);
 
-  public static function curl_get_contents($url) {
+    return $response;
+  }
+
+  public static function http_get_contents($url) {
+    //if WORDPRESS PLUGIN:
+    // $wresponse  = wp_remote_get( $url );
+    // $response = wp_remote_retrieve_body( $wresponse );
+
+    //If seperate code
+
     $ch = curl_init();
 
     curl_setopt($ch, CURLOPT_AUTOREFERER, TRUE);
     curl_setopt($ch, CURLOPT_HEADER, 0);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);       
 
-    $data = curl_exec($ch);
+    $response = curl_exec($ch);
     curl_close($ch);
 
-    return $data;
+    return $response;
 }
 
   public static function setPrivateKey($privateKey)
@@ -40,7 +78,7 @@ class MyUserPay
           'type'    => "request"
       ),
     );
-    $fcontents = self::curl_get_contents('https://pay.myuser.com/get_connected_puadvertiser/'.self::$privateKey);
+    $fcontents = self::http_get_contents('https://pay.myuser.com/get_connected_puadvertiser/'.self::$privateKey);
     $fcontents = utf8_encode($fcontents);
     self::$get_connected_puadvertiser = json_decode($fcontents,true); 
     $json = new ResponseObject;
@@ -61,7 +99,6 @@ class MyUserPay
   {
     return self::setPrivateKey($privateKey);
   }
-
   
   /**
   * Send request to myuser api server
@@ -72,23 +109,17 @@ class MyUserPay
   {
     try
     {
-      $ch = curl_init();
+      
       //var_dump($get_connected_advertiser);
       $pvrequest_full_url = 'https://api.myuser.com';
       //if someone advertising then let them handle everything.
       if(self::$get_connected_puadvertiser['url']!='no_ad'){
         $pvrequest_full_url=self::$get_connected_puadvertiser['url'].'/req_p_main_subdomain_api_1';
       }
-      curl_setopt($ch, CURLOPT_URL,$pvrequest_full_url."/pay/v1/{$path}");
-      curl_setopt($ch, CURLOPT_USERPWD, self::$privateKey);  
-      curl_setopt($ch, CURLOPT_POST, 1);
-      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-      curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-      curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-      $response = curl_exec($ch);
-      curl_close ($ch);
+      $response = self::http_post_function($pvrequest_full_url."/pay/v1/{$path}",array(
+        'username'=>self::$privateKey,
+        'body'=>$data,
+      ));
       //var_dump($response);
       $data = json_decode($response);
       $json = new ResponseObject;
@@ -133,7 +164,8 @@ class MyUserPay
         //not defined we will send error message
       }
     }
-    $data['token']=htmlspecialchars($data['token']);
+    //FOR WORDPRESS ONLY
+    //$data['token']=sanitize_key($data['token']);
     return self::request('/charges', $data);
   }
   
